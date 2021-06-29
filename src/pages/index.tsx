@@ -1,5 +1,8 @@
 import React, { useState } from "react";
 
+import firebase from "firebase/app"
+import "firebase/firestore"
+
 import Head from "next/head"
 
 import algosdk from 'algosdk';
@@ -32,7 +35,7 @@ export default function Index() {
     }
   }
 
-  const sendToBanker = async() => {
+  const sendToBanker = async(amount) => {
     try {
       const algodClient = new algosdk.Algodv2('Algos', 'https://api.testnet.algoexplorer.io', '');
       const params = await algodClient.getTransactionParams().do();
@@ -42,7 +45,7 @@ export default function Index() {
           type: 'pay',
           from: activeAddress,
           to:  'Z3W4BTN5JQQ76AFQX2B2TGU3NPKGXF7TA7OJ4BYS4BK5FAITCED7AFRZXI',
-          amount: 1000000, // 1 algo
+          amount: amount * 1000000, // 1 algo * amount
           note: new Uint8Array(Buffer.from('...')),
       };
     
@@ -50,13 +53,26 @@ export default function Index() {
       console.log(signedTxn);
   
       await algodClient.sendRawTransaction(signedTxn.blob).do();
+
+      firebase.firestore().collection("accounts").where("wallet", "==", activeAddress)
+      .get()
+      .then((query) => {
+        console.log(query)
+        query.forEach((doc) => {
+          firebase.firestore().collection("accounts").doc(doc.id)
+          .update({
+            credits: firebase.firestore.FieldValue.increment(amount)
+          })
+        })
+      })
+
     }
     catch(err) {
       console.error(err); 
     }
   }
 
-  const sendFromBanker = async() => {
+  const sendFromBanker = async(amount) => {
     try {
       const algodClient = new algosdk.Algodv2('Algos', 'https://api.testnet.algoexplorer.io', '');
       const params = await algodClient.getTransactionParams().do();
@@ -66,7 +82,7 @@ export default function Index() {
           type: 'pay',
           from: 'Z3W4BTN5JQQ76AFQX2B2TGU3NPKGXF7TA7OJ4BYS4BK5FAITCED7AFRZXI',
           to:  activeAddress,
-          amount: 1000000, // 1 algo
+          amount: amount * 1000000, // 1 algo * amount
           note: new Uint8Array(Buffer.from('...')),
       };
       console.log(txn)
@@ -80,6 +96,20 @@ export default function Index() {
       console.log(signedTxn);
   
       await algodClient.sendRawTransaction(signedTxn.blob).do();
+
+      firebase.firestore().collection("accounts").where("wallet", "==", activeAddress)
+      .get()
+      .then((query) => {
+        console.log(query)
+        query.forEach((doc) => {
+          firebase.firestore().collection("accounts").doc(doc.id)
+          .update({
+            credits: firebase.firestore.FieldValue.increment(-amount)
+          })
+        })
+      })
+      
+
     }
     catch(err) {
       console.error(err); 
